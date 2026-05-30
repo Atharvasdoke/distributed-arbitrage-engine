@@ -18,11 +18,12 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
         const [dashRes, pricesRes] = await Promise.all([
-          fetch("http://localhost:3001/api/dashboard", {
+          fetch(`${API_URL}/api/dashboard`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:3001/api/prices", {
+          fetch(`${API_URL}/api/prices`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
