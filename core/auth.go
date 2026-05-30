@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -32,7 +31,7 @@ func RegisterHandler(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to hash password"})
 	}
 
-	_, err = DB.Exec(context.Background(), "INSERT INTO users (email, password_hash) VALUES ($1, $2)", req.Email, string(hash))
+	_, err = DB.Exec("INSERT INTO users (email, password_hash) VALUES (?, ?)", req.Email, string(hash))
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "User already exists or failed to create"})
 	}
@@ -48,7 +47,7 @@ func LoginHandler(c *fiber.Ctx) error {
 
 	var storedHash string
 	var userId int
-	err := DB.QueryRow(context.Background(), "SELECT id, password_hash FROM users WHERE email = $1", req.Email).Scan(&userId, &storedHash)
+	err := DB.QueryRow("SELECT id, password_hash FROM users WHERE email = ?", req.Email).Scan(&userId, &storedHash)
 	if err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid credentials"})
 	}

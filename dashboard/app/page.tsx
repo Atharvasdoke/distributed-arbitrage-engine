@@ -7,7 +7,11 @@ import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
   const [prices, setPrices] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [retailers, setRetailers] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -19,26 +23,25 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const [dashRes, pricesRes] = await Promise.all([
-          fetch(`${API_URL}/api/dashboard`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_URL}/api/prices`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+        const [dashRes, pricesRes, prodRes, retRes, alertRes] = await Promise.all([
+          fetch(`${API_URL}/api/dashboard`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/api/prices`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/api/products`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/api/retailers`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/api/alerts`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
 
-        if (dashRes.status === 401 || pricesRes.status === 401) {
+        if (dashRes.status === 401) {
           localStorage.removeItem("token");
           window.location.href = "/login";
           return;
         }
 
-        const dashData = await dashRes.json();
-        const pricesData = await pricesRes.json();
-
-        setData(dashData);
-        setPrices(pricesData || []);
+        setData(await dashRes.json());
+        setPrices(await pricesRes.json() || []);
+        setProducts(await prodRes.json() || []);
+        setRetailers(await retRes.json() || []);
+        setAlerts(await alertRes.json() || []);
       } catch (e) {
         console.error("Failed to fetch data", e);
       } finally {
@@ -80,10 +83,10 @@ export default function Dashboard() {
             Precision Arbitrage
           </h1>
           <nav className="space-y-2">
-            <a href="#" className="block rounded-md bg-emerald/10 px-4 py-2 font-medium text-emerald">Overview</a>
-            <a href="#" className="block rounded-md px-4 py-2 font-medium text-slate/70 hover:bg-slate/5 hover:text-slate">Products</a>
-            <a href="#" className="block rounded-md px-4 py-2 font-medium text-slate/70 hover:bg-slate/5 hover:text-slate">Retailers</a>
-            <a href="#" className="block rounded-md px-4 py-2 font-medium text-slate/70 hover:bg-slate/5 hover:text-slate">Alerts</a>
+            <button onClick={() => setActiveTab('overview')} className={`w-full text-left rounded-md px-4 py-2 font-medium ${activeTab === 'overview' ? 'bg-emerald/10 text-emerald' : 'text-slate/70 hover:bg-slate/5 hover:text-slate'}`}>Overview</button>
+            <button onClick={() => setActiveTab('products')} className={`w-full text-left rounded-md px-4 py-2 font-medium ${activeTab === 'products' ? 'bg-emerald/10 text-emerald' : 'text-slate/70 hover:bg-slate/5 hover:text-slate'}`}>Products</button>
+            <button onClick={() => setActiveTab('retailers')} className={`w-full text-left rounded-md px-4 py-2 font-medium ${activeTab === 'retailers' ? 'bg-emerald/10 text-emerald' : 'text-slate/70 hover:bg-slate/5 hover:text-slate'}`}>Retailers</button>
+            <button onClick={() => setActiveTab('alerts')} className={`w-full text-left rounded-md px-4 py-2 font-medium ${activeTab === 'alerts' ? 'bg-emerald/10 text-emerald' : 'text-slate/70 hover:bg-slate/5 hover:text-slate'}`}>Alerts</button>
           </nav>
         </div>
         <button onClick={handleLogout} className="text-left text-sm text-slate/50 hover:text-alert transition">
@@ -147,37 +150,132 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Market Arbitrage Grid */}
-        <h3 className="mb-4 text-lg font-semibold">Latest Price Feeds</h3>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-          {prices.slice(0, 6).map((priceItem, idx) => (
-            <div key={idx} className="rounded-4xl bg-white p-6 shadow-sm border border-gray-100 transition hover:shadow-md">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Product ID: {priceItem.product_id}</p>
-                  <p className="text-xl font-bold">${priceItem.price.toFixed(2)}</p>
+        {/* Main Conditional Content */}
+        {activeTab === 'overview' && (
+          <>
+            <h3 className="mb-4 text-lg font-semibold">Latest Price Feeds</h3>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+              {prices.length === 0 ? (
+                <div className="col-span-3 text-center py-12 text-gray-400">Waiting for live market data...</div>
+              ) : prices.slice(0, 6).map((priceItem, idx) => (
+                <div key={idx} className="rounded-4xl bg-white p-6 shadow-sm border border-gray-100 transition hover:shadow-md">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Product ID: {priceItem.product_id}</p>
+                      <p className="text-xl font-bold">${priceItem.price.toFixed(2)}</p>
+                    </div>
+                    {idx % 3 === 0 ? (
+                      <span className="rounded-md bg-alert px-2 py-1 text-xs font-bold text-white tracking-wider">ARBITRAGE ALERT</span>
+                    ) : (
+                      <span className="rounded-md bg-slate-200 px-2 py-1 text-xs font-bold text-gray-600 tracking-wider">STABLE</span>
+                    )}
+                  </div>
+                  <div className="h-16 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={generateSparkline(priceItem.price)}>
+                        <YAxis domain={['dataMin', 'dataMax']} hide />
+                        <Line type="monotone" dataKey="value" stroke={idx % 3 === 0 ? '#ef4444' : '#10b981'} strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-4 flex justify-between border-t border-gray-100 pt-4 text-sm text-gray-500">
+                    <span>Retailer ID: {priceItem.retailer_id}</span>
+                    <span>Just now</span>
+                  </div>
                 </div>
-                {idx % 2 === 0 ? (
-                  <span className="rounded-md bg-alert px-2 py-1 text-xs font-bold text-white tracking-wider">ARBITRAGE ALERT</span>
-                ) : (
-                  <span className="rounded-md bg-slate-200 px-2 py-1 text-xs font-bold text-gray-600 tracking-wider">STABLE</span>
-                )}
-              </div>
-              <div className="h-16 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={generateSparkline(priceItem.price)}>
-                    <YAxis domain={['dataMin', 'dataMax']} hide />
-                    <Line type="monotone" dataKey="value" stroke={idx % 2 === 0 ? '#ef4444' : '#10b981'} strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-4 flex justify-between border-t border-gray-100 pt-4 text-sm text-gray-500">
-                <span>Retailer ID: {priceItem.retailer_id}</span>
-                <span>Just now</span>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
+
+        {activeTab === 'products' && (
+          <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+            <h3 className="mb-6 text-xl font-bold">Tracked Products</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-500">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-700">
+                  <tr>
+                    <th className="px-6 py-3">ID</th>
+                    <th className="px-6 py-3">Product Name</th>
+                    <th className="px-6 py-3">SKU</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p, i) => (
+                    <tr key={i} className="border-b bg-white">
+                      <td className="px-6 py-4 font-medium text-gray-900">{p.id}</td>
+                      <td className="px-6 py-4">{p.name}</td>
+                      <td className="px-6 py-4">{p.sku}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'retailers' && (
+          <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+            <h3 className="mb-6 text-xl font-bold">Supported Retailers</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-500">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-700">
+                  <tr>
+                    <th className="px-6 py-3">ID</th>
+                    <th className="px-6 py-3">Retailer Name</th>
+                    <th className="px-6 py-3">URL</th>
+                    <th className="px-6 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {retailers.map((r, i) => (
+                    <tr key={i} className="border-b bg-white">
+                      <td className="px-6 py-4 font-medium text-gray-900">{r.id}</td>
+                      <td className="px-6 py-4">{r.name}</td>
+                      <td className="px-6 py-4 text-emerald">{r.url}</td>
+                      <td className="px-6 py-4"><span className="px-2 py-1 bg-emerald/20 text-emerald rounded-full text-xs font-bold">Active</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'alerts' && (
+          <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+            <h3 className="mb-6 text-xl font-bold">Arbitrage Alerts</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-500">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-700">
+                  <tr>
+                    <th className="px-6 py-3">Product</th>
+                    <th className="px-6 py-3">Min Price</th>
+                    <th className="px-6 py-3">Max Price</th>
+                    <th className="px-6 py-3">Spread (Profit)</th>
+                    <th className="px-6 py-3">ROI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alerts.map((a, i) => (
+                    <tr key={i} className="border-b bg-white">
+                      <td className="px-6 py-4 font-medium text-gray-900">{a.product_name}</td>
+                      <td className="px-6 py-4 text-emerald font-bold">${a.min_price.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-alert font-bold">${a.max_price.toFixed(2)}</td>
+                      <td className="px-6 py-4 font-bold text-gray-900">${a.spread.toFixed(2)}</td>
+                      <td className="px-6 py-4 font-bold text-emerald">{a.roi.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                  {alerts.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-gray-400">No active arbitrage opportunities found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

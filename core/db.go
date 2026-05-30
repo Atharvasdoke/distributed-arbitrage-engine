@@ -1,58 +1,66 @@
 package main
 
 import (
-	"context"
+	"database/sql"
 	"fmt"
 	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "modernc.org/sqlite"
 )
 
-var DB *pgxpool.Pool
+var DB *sql.DB
 
 func ConnectDB() error {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://postgres:postgres@localhost:5432/arbitrage?sslmode=disable"
+		dsn = "arbitrage.db"
 	}
-	pool, err := pgxpool.New(context.Background(), dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
-	DB = pool
+	DB = db
 	return initSchema()
 }
 
 func initSchema() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS users (
-		id SERIAL PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		email VARCHAR(255) UNIQUE NOT NULL,
 		password_hash VARCHAR(255) NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS retailers (
-		id SERIAL PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name VARCHAR(255) NOT NULL,
 		url VARCHAR(255) NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS products (
-		id SERIAL PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name VARCHAR(255) NOT NULL,
 		sku VARCHAR(255) UNIQUE NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS prices (
-		id SERIAL PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		product_id INTEGER REFERENCES products(id),
 		retailer_id INTEGER REFERENCES retailers(id),
-		price NUMERIC(10, 2) NOT NULL,
+		price REAL NOT NULL,
 		currency VARCHAR(10) NOT NULL,
-		timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	INSERT OR IGNORE INTO retailers (id, name, url) VALUES 
+		(1, 'eBay', 'https://www.ebay.com'),
+		(2, 'Newegg', 'https://www.newegg.com');
+
+	INSERT OR IGNORE INTO products (id, name, sku) VALUES 
+		(1, 'Sony PlayStation 5', 'PlayStation 5 Console'),
+		(2, 'NVIDIA RTX 4090', 'RTX 4090 Graphics Card');
 	`
-	_, err := DB.Exec(context.Background(), schema)
+	_, err := DB.Exec(schema)
 	return err
 }
