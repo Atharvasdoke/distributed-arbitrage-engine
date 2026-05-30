@@ -1,12 +1,10 @@
-services:
-  # 1. PostgreSQL Database
-  - type: pgo
-    name: arbitrage-db
+databases:
+  - name: arbitrage-db
     databaseName: arbitrage
     user: arbitrage_user
     plan: free
 
-  # 2. Go Backend Web Service
+services:
   - type: web
     name: arbitrage-backend
     env: go
